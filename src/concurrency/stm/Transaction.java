@@ -10,9 +10,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author mishadoff
  */
 public final class Transaction extends Context{
-    private HashMap<Ref, Object> inTxMap = new HashMap<>();
-    private HashSet<Ref> toUpdate = new HashSet<>();
-    private HashMap<Ref, Long> version = new HashMap<>();
+    private HashMap<Ref, Object> inTxMap = new HashMap<Ref, Object>();
+    private HashSet<Ref> toUpdate = new HashSet<Ref>();
+    private HashMap<Ref, Long> version = new HashMap<Ref, Long>();
 
     private long revision;
     private static AtomicLong transactionNum = new AtomicLong(0);
@@ -44,6 +44,7 @@ public final class Transaction extends Context{
     boolean commit() {
         synchronized (STM.commitLock) {
             // validation
+            Long beforeValidation = System.nanoTime();
             boolean isValid = true;
             for (Ref ref : inTxMap.keySet()) {
                 if (ref.content.revision != version.get(ref)) {
@@ -51,13 +52,18 @@ public final class Transaction extends Context{
                     break;
                 }
             }
+            Long afterValidation = System.nanoTime();
+            Metrics.addValidationTime(afterValidation - beforeValidation);
 
             // writes
+            Long beforeUpdate = System.nanoTime();
             if (isValid) {
                 for (Ref ref : toUpdate) {
                     ref.content = RefTuple.get(inTxMap.get(ref), revision);
                 }
             }
+            Long afterUpdate = System.nanoTime();
+            Metrics.addUpdateRefTime(afterUpdate - beforeUpdate);
             return isValid;
         }
     }
